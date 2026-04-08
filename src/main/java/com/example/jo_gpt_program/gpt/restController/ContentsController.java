@@ -3,14 +3,9 @@ package com.example.jo_gpt_program.gpt.restController;
 import com.example.jo_gpt_program.gpt.dto.MyChatDTO;
 import com.example.jo_gpt_program.gpt.service.ContentsService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/contents")
@@ -29,8 +24,9 @@ public class ContentsController {
     }
 
     @PostMapping("/myContents")
-    public ResponseEntity<String> getMyContents(@RequestBody MyChatDTO dto) {
-        log.debug("dto :{}", dto);
+    public ResponseEntity<String> getMyContents(@RequestBody MyChatDTO dto, @RequestHeader("Authorization") String authHeader) {
+
+        log.debug("authHeader :{}", authHeader);
         String response = contentsService.myChat(dto);
         log.debug("response :{}", response);
         System.out.println("response :" + response);
