@@ -1,6 +1,7 @@
 package com.example.jo_gpt_program.gpt.restController;
 
 import com.example.jo_gpt_program.gpt.dto.MyChatDTO;
+import com.example.jo_gpt_program.gpt.dto.ShowChatDTO;
 import com.example.jo_gpt_program.gpt.service.ContentsService;
 import com.example.memberssecurity.member.service.MemberService;
 import com.example.memberssecurity.security.config.jwt.JWTUtils;
@@ -34,17 +35,30 @@ public class ContentsController {
 
     @PostMapping("/myContents")
     public ResponseEntity<String> getMyContents(@RequestBody MyChatDTO dto, @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null) {
+            return ResponseEntity.badRequest().body("Authorization header is missing");
+        }
         authHeader = authHeader.replace("Bearer ", "");
 
-        Long memberKey = jwtUtils.getUsername(authHeader );
-        contentsService.userInfo(memberKey,dto);
+        Long memberKey = jwtUtils.getUsername(authHeader);
+        String success = contentsService.userInfo(memberKey, dto);
 
-        return ResponseEntity.ok("success");
+        return ResponseEntity.ok(success);
     }
 
     @PostMapping("/gptContents")
     public ResponseEntity<String> getGptContents(@RequestBody MyChatDTO dto) {
         String response = contentsService.sendGemini(dto, geminiKey);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/chatRoom")
+    public ResponseEntity<String> createChatRoom( @RequestHeader("Authorization") String authHeader) {
+        contentsService.createChat(authHeader);
+
+
+        log.debug("dtosss={}", authHeader);
+
+        return ResponseEntity.ok("Chat room created successfully");
     }
 }
