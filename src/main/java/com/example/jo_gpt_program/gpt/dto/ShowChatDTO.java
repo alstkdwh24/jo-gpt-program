@@ -13,9 +13,12 @@ import java.time.LocalDateTime;
 @Builder
 public class ShowChatDTO {
 
-    private String showChatContents;
+    private String showMyChatContents;
+
 
     private LocalDateTime showChatRegistration;
+
+
 
 
 

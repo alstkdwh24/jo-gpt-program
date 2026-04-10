@@ -6,6 +6,7 @@ import com.example.entitycom.entity.member.Members;
 import com.example.entitycom.entity.member.MyChat;
 import com.example.jo_gpt_program.gpt.dto.MyChatDTO;
 import com.example.jo_gpt_program.gpt.dto.ShowChatDTO;
+import com.example.jo_gpt_program.gpt.repository.jpa.CreateTimeRepository;
 import com.example.jo_gpt_program.gpt.repository.jpa.MyChatRepository;
 import com.example.jo_gpt_program.gpt.repository.jpa.ShowChatRepository;
 import com.example.memberssecurity.member.repository.jpa.MemberRepository;
@@ -17,7 +18,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("ALL")
@@ -32,14 +36,17 @@ public class ContentsService {
 
     private final ShowChatRepository showChatRepository;
 
+    private final CreateTimeRepository createTimeRepository;
+
     private final JWTUtils jwtUtils;
 
     public ContentsService(@Qualifier("myChatRepository") MyChatRepository myChatRepository,
-                           RestTemplate restTemplate, MemberRepository memberRepository, ShowChatRepository showChatRepository, JWTUtils jwtUtils) {
+                           RestTemplate restTemplate, MemberRepository memberRepository, ShowChatRepository showChatRepository, CreateTimeRepository createTimeRepository, JWTUtils jwtUtils) {
         this.restTemplate = restTemplate;
         this.myChatRepository = myChatRepository;
         this.memberRepository = memberRepository;
         this.showChatRepository = showChatRepository;
+        this.createTimeRepository = createTimeRepository;
         this.jwtUtils = jwtUtils;
     }
     /*유저 정보 불러오기*/
@@ -56,9 +63,10 @@ public class ContentsService {
     /*내가 적은 치탱 BD 저장*/
     @Transactional
     public String myChat(MyChatDTO dto, Members member) {
-
+        Optional<Members> members = memberRepository.findByMemberKey(member.getMemberKey());
+        Members members1 = members.orElseThrow(() -> new RuntimeException("Member not found with key: " + member.getMemberKey()));
         MyChat chat = MyChat.builder()
-                .member(member)
+                .member(members1)
 
                 .myChatContents(dto.getMyChatContents())
                 .myChatImage(dto.getMyChatImage())
@@ -66,6 +74,7 @@ public class ContentsService {
 
                         .build()) // 여기서 builder로 생성만 하면, 위에서 추가한 @CreatedDate가 저장 시점에 시간을 자동 기입한다.
                 .build();
+
 
         MyChat myChat = myChatRepository.save(chat);
 
@@ -79,8 +88,7 @@ public class ContentsService {
                 List.of(Map.of("parts", List.of(Map.of("text", dto.getMyChatContents())))));
 
         ResponseEntity<String> response = restTemplate.postForEntity(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key="
-                        + geminiKey,
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + geminiKey,
                 body, String.class);
         log.debug("response gemini :{}", response);
         String body2 = response.getBody();
@@ -94,26 +102,29 @@ public class ContentsService {
 
     /*채팅방 만드는 메서드*/
     @Transactional
-    public void createChat(String authHeader) {
+    public void createChat(String authHeader, MyChatDTO dto) {
         Members members = this.authHeader(authHeader);
         log.debug("membersssss={}", members);
+// 1. ShowChat 생성 및 '저장' (save 호출!)
         ShowChat showChat = ShowChat.builder()
                 .members(members)
-                .createTimeLogs(new HashSet<>())  // ← null 방지
-                .myChat(new HashSet<>())          // ← 이것도 같이
-                .gptChat(new HashSet<>())         // ← 이것도 같이
                 .build();
+        showChat = showChatRepository.save(showChat); // DB에서 키값을 받아옴
 
-        CreateTimeLogs createTimeLogs = CreateTimeLogs.builder()
-                .showChat(showChat) // 핵심: 외래키 주인에 참조 설정
-                .build(); //@CreatedDate 가 자동으로 시간 단축
-        List<MyChat> myChatDto = myChatRepository.findMyChatByMember(members);
-        log.debug("myChatDto={}", myChatDto);
+        // 2. 이제 키값이 있는 showChat을 MyChat에 연결
+        MyChat myChat = MyChat.builder()
+                .showChat(showChat)
+                .member(members) // Member 키도 잊지 말고 넣어주세요!
+                .myChatContents(dto.getMyChatContents())
+                .build();
+        myChatRepository.save(myChat);
+
+        CreateTimeLogs createTimeLogs=CreateTimeLogs.builder()
+                .showChat(showChat)
+                .build();
+        createTimeRepository.save(createTimeLogs);
 
 
-
-        showChat.getCreateTimeLogs().add(createTimeLogs);
-        showChatRepository.save(showChat);
 
 
     }
@@ -159,7 +170,7 @@ public class ContentsService {
         log.debug("showChatReal:{}", showChats.stream());
         Set<ShowChatDTO> showChatDTOS = showChats.stream().map(chat -> ShowChatDTO.builder()
                 .showChatRegistration(chat.getCreateTimeLogs() != null && !chat.getCreateTimeLogs().isEmpty() ? chat.getCreateTimeLogs().iterator().next().getCreatedAt() : null
-                ).showChatContents(chat.getMyChat() != null && !chat.getMyChat().isEmpty() ? chat.getMyChat().iterator().next().getMyChatContents() : null).build()).collect(Collectors.toSet());
+                ).showMyChatContents(chat.getMyChat() != null && !chat.getMyChat().isEmpty() ? chat.getMyChat().iterator().next().getMyChatContents() : null).build()).collect(Collectors.toSet());
         return showChatDTOS;
     }
 }
