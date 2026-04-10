@@ -18,6 +18,7 @@ public class MyChatDTO {
     String myChatContents;
     String myChatImage;
     LocalDateTime myChatRegistration;
+    Long showChatKey;
 
     public void changeMyChatContents(String myChatContents) {
         this.myChatContents = myChatContents;

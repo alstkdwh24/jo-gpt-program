@@ -15,4 +15,6 @@ public interface ShowChatRepository extends JpaRepository<ShowChat, Long> {
     Optional<Object> findShowChatByMembers(Members members);
 
     Set<ShowChat> findByMembers(@Param("members") Members members);
+
+    Optional<ShowChat> findShowChatByShowChatKey(Long showChatKey);
 }

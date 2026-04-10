@@ -64,10 +64,14 @@ public class ContentsService {
     @Transactional
     public String myChat(MyChatDTO dto, Members member) {
         Optional<Members> members = memberRepository.findByMemberKey(member.getMemberKey());
+        Optional<ShowChat> showChat = showChatRepository.findShowChatByShowChatKey(dto.getShowChatKey());
+        log.debug("showChatTwo={}", showChat);
+
         Members members1 = members.orElseThrow(() -> new RuntimeException("Member not found with key: " + member.getMemberKey()));
+       ShowChat showChat1 = showChat.orElseThrow(() -> new RuntimeException("ShowChat not found for showChatKey: " + dto.getShowChatKey()));
         MyChat chat = MyChat.builder()
                 .member(members1)
-
+                .showChat(showChat1)
                 .myChatContents(dto.getMyChatContents())
                 .myChatImage(dto.getMyChatImage())
                 .createTimeLogs(CreateTimeLogs.builder()
@@ -102,31 +106,30 @@ public class ContentsService {
 
     /*채팅방 만드는 메서드*/
     @Transactional
-    public void createChat(String authHeader, MyChatDTO dto) {
+    public Long createChat(String authHeader, MyChatDTO dto) {
         Members members = this.authHeader(authHeader);
-        log.debug("membersssss={}", members);
 // 1. ShowChat 생성 및 '저장' (save 호출!)
         ShowChat showChat = ShowChat.builder()
                 .members(members)
                 .build();
-        showChat = showChatRepository.save(showChat); // DB에서 키값을 받아옴
+        ShowChat showChat1 = showChatRepository.save(showChat); // DB에서 키값을 받아옴
 
+        log.debug("showChat1={}", showChat1.getShowChatKey());
         // 2. 이제 키값이 있는 showChat을 MyChat에 연결
         MyChat myChat = MyChat.builder()
-                .showChat(showChat)
+                .showChat(showChat1)
                 .member(members) // Member 키도 잊지 말고 넣어주세요!
                 .myChatContents(dto.getMyChatContents())
                 .build();
         myChatRepository.save(myChat);
 
-        CreateTimeLogs createTimeLogs=CreateTimeLogs.builder()
-                .showChat(showChat)
+        CreateTimeLogs createTimeLogs = CreateTimeLogs.builder()
+                .showChat(showChat1)
                 .build();
         createTimeRepository.save(createTimeLogs);
+        log.debug("showChat={}", showChat1);
 
-
-
-
+        return showChat1.getShowChatKey();
     }
 
     /*JWT 토큰으로 사용자 정보 가져오기*/
