@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
+
 @RestController
 @RequestMapping("/contents")
 @Slf4j
@@ -61,4 +63,12 @@ public class ContentsController {
 
         return ResponseEntity.ok("Chat room created successfully");
     }
+//여기서는 엔티티를 넣는 것보다는 DTO필드를 넣으면 된다 조인한 데이터가 필요하다면 DTO에 넣으면 된다.
+    @GetMapping("/chattingList")
+    public ResponseEntity<Set<ShowChatDTO>> getChattingList(@RequestHeader("Authorization") String authHeader) {
+        Set<ShowChatDTO> showChatList = contentsService.getChattingList(authHeader);
+        log.debug("showChatListssss={}", showChatList);
+        return ResponseEntity.ok(showChatList);
+    }
+
 }

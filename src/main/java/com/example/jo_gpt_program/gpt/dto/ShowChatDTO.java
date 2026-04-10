@@ -5,13 +5,17 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 public class ShowChatDTO {
 
-    private Long showChatKey;
+    private String showChatContents;
+
+    private LocalDateTime showChatRegistration;
 
 
 

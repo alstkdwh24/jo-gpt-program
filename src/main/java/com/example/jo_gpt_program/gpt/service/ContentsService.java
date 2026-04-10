@@ -5,6 +5,7 @@ import com.example.entitycom.entity.log.CreateTimeLogs;
 import com.example.entitycom.entity.member.Members;
 import com.example.entitycom.entity.member.MyChat;
 import com.example.jo_gpt_program.gpt.dto.MyChatDTO;
+import com.example.jo_gpt_program.gpt.dto.ShowChatDTO;
 import com.example.jo_gpt_program.gpt.repository.jpa.MyChatRepository;
 import com.example.jo_gpt_program.gpt.repository.jpa.ShowChatRepository;
 import com.example.memberssecurity.member.repository.jpa.MemberRepository;
@@ -16,9 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("ALL")
 @Service("contentsService")
@@ -53,6 +53,7 @@ public class ContentsService {
 
     }
 
+    /*내가 적은 치탱 BD 저장*/
     @Transactional
     public String myChat(MyChatDTO dto, Members member) {
 
@@ -71,6 +72,7 @@ public class ContentsService {
         return myChat.getMyChatContents();
     }
 
+    /*제미나이한테 보낼 메시지랑 제미나이 API연결*/
     public String sendGemini(MyChatDTO dto, String geminiKey) {
 
         Map<String, Object> body = Map.of("contents",
@@ -90,39 +92,74 @@ public class ContentsService {
         return response.getBody();
     }
 
-
+    /*채팅방 만드는 메서드*/
+    @Transactional
     public void createChat(String authHeader) {
         Members members = this.authHeader(authHeader);
         log.debug("membersssss={}", members);
         ShowChat showChat = ShowChat.builder()
                 .members(members)
-                .myChat()
+                .createTimeLogs(new HashSet<>())  // ← null 방지
+                .myChat(new HashSet<>())          // ← 이것도 같이
+                .gptChat(new HashSet<>())         // ← 이것도 같이
                 .build();
+
+        CreateTimeLogs createTimeLogs = CreateTimeLogs.builder()
+                .showChat(showChat) // 핵심: 외래키 주인에 참조 설정
+                .build(); //@CreatedDate 가 자동으로 시간 단축
+        List<MyChat> myChatDto = myChatRepository.findMyChatByMember(members);
+        log.debug("myChatDto={}", myChatDto);
+
+
+
+        showChat.getCreateTimeLogs().add(createTimeLogs);
         showChatRepository.save(showChat);
 
 
     }
 
-    public Members authHeader(String authHeader) {
+    /*JWT 토큰으로 사용자 정보 가져오기*/
+    private Members authHeader(String authHeader) {
         if (authHeader == null) {
             throw new IllegalArgumentException("Authorization header is missing");
         }
         authHeader = authHeader.replace("Bearer ", "");
         Long memberKey = jwtUtils.getUsername(authHeader);
-        Members members=userInfoTwo(memberKey);
-        if(members == null) {
+        Members members = userInfoTwo(memberKey);
+        if (members == null) {
             throw new RuntimeException("Member not Object: " + members);
         }
 
 
         return members;
     }
+
     /*유저 정보 불러오기*/
-    public Members userInfoTwo(Long memberKey) {
+    private Members userInfoTwo(Long memberKey) {
         Optional<Members> members = memberRepository.findByMemberKey(memberKey);
         Members member = members.orElseThrow(() -> new RuntimeException("Member not found with key: " + memberKey));
         log.debug("member={}", member);
         return member;
 
+    }
+
+    @Transactional
+    public Set<ShowChatDTO> getChattingList(String authHeader) {
+        Members members = authHeader(authHeader);
+        Set<ShowChat> showChats = showChatRepository.findByMembers(members);
+        showChats.forEach(chat -> {
+            log.debug("showChatKey={}", chat.getShowChatKey());
+            log.debug("members={}", chat.getMembers());
+            log.debug("createTimeLogs={}", chat.getCreateTimeLogs());
+            log.debug("myChat={}", chat.getMyChat());
+            log.debug("gptChat={}", chat.getGptChat());
+            log.debug("chatAttachment={}", chat.getChatAttachment());
+        });
+
+        log.debug("showChatReal:{}", showChats.stream());
+        Set<ShowChatDTO> showChatDTOS = showChats.stream().map(chat -> ShowChatDTO.builder()
+                .showChatRegistration(chat.getCreateTimeLogs() != null && !chat.getCreateTimeLogs().isEmpty() ? chat.getCreateTimeLogs().iterator().next().getCreatedAt() : null
+                ).showChatContents(chat.getMyChat() != null && !chat.getMyChat().isEmpty() ? chat.getMyChat().iterator().next().getMyChatContents() : null).build()).collect(Collectors.toSet());
+        return showChatDTOS;
     }
 }
